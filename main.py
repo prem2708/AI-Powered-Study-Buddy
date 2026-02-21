@@ -39,264 +39,170 @@ if "explain_topic" not in st.session_state: st.session_state.explain_topic = ""
 if "summarize_result" not in st.session_state: st.session_state.summarize_result = ""
 if "summarize_text" not in st.session_state: st.session_state.summarize_text = ""
 
+# ─── Navigation Setup ───
+NAV_OPTIONS = [
+    "🏠 Home",
+    "🧠 Explain",
+    "📝 Summarize",
+    "🎯 Quiz Me",
+    "🗂️ Flashcards",
+    "💬 Chat Tutor"
+]
+NAV_SLUGS = {
+    "home": "🏠 Home",
+    "explain": "🧠 Explain",
+    "summarize": "📝 Summarize",
+    "quiz": "🎯 Quiz Me",
+    "flashcards": "🗂️ Flashcards",
+    "chat": "💬 Chat Tutor",
+}
+
+try:
+    qp = st.experimental_get_query_params()
+    slug = (qp.get("page") or [None])[0]
+    if slug in NAV_SLUGS:
+        st.session_state.nav_radio = NAV_SLUGS[slug]
+except Exception:
+    pass
+
 # ─── Custom CSS ─────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-/* ── Base Reset ── */
+:root{
+    --bg: #0b0d10;
+    --surface: #12151b;
+    --surface-2: #171c24;
+    --border: rgba(148,163,184,0.18);
+    --accent: #b6ff2b;
+    --accent-2: #7dff3a;
+    --muted: #a0a8b6;
+    --text: #e6e9ef;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body, .stApp {
     font-family: 'Inter', sans-serif;
-    background: #0a0e1a;
-    color: #e2e8f0;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
 }
 
-/* ── Hide Streamlit Branding ── */
-/* ── Hide Streamlit Branding ── */
 #MainMenu, footer { visibility: hidden; }
-/* header { visibility: hidden; } */
 
-/* ── Sidebar ── */
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0d1124 0%, #111827 100%);
-    border-right: 1px solid rgba(99,102,241,0.2);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding-top: 10px;
 }
-[data-testid="stSidebar"] * { color: #e2e8f0 !important; }
+[data-testid="stSidebar"] * { color: var(--text) !important; }
 
-/* ── Sidebar Navigation Styling ── */
-/* Hide default radio buttons */
-[data-testid="stSidebar"] [data-testid="stRadio"] label {
+[data-testid="stSidebar"] [data-testid="stRadio"] label{
+    padding: 0.55rem 0.9rem;
+    color: var(--muted);
+    border-radius: 10px;
     display: flex;
     align-items: center;
-    padding: 0.5rem 1rem;
-    background: transparent;
-    border-radius: 8px;
-    margin-bottom: 0.2rem;
-    transition: all 0.2s;
-    cursor: pointer;
-    font-weight: 500;
+    gap: 0.6rem;
+    transition: all 0.18s ease;
+    font-weight: 600;
 }
-/* This is a bit tricky to target exact active state in pure CSS without hacks, 
-   but we can style the hover state. */
-[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
-    background: rgba(99,102,241,0.15);
-    color: #a78bfa !important;
+[data-testid="stSidebar"] [data-testid="stRadio"] label:hover{
+    background: rgba(182,255,43,0.12);
+    color: var(--accent);
+}
+/* Active/selected state: Streamlit sometimes adds aria-checked on labels */
+[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"],
+[data-testid="stSidebar"] [data-testid="stRadio"] input:checked + label{
+    background: linear-gradient(90deg, rgba(182,255,43,0.2), rgba(125,255,58,0.18));
+    color: var(--text) !important;
+    box-shadow: inset 0 0 0 1px rgba(182,255,43,0.35);
+    border-radius: 10px;
 }
 
-/* ── Interactive Elements ── */
 button { cursor: pointer !important; }
-div[data-testid="stSelectbox"] > div > div { cursor: pointer !important; }
-div[data-testid="stRadio"] label { cursor: pointer !important; }
 
-/* ── Main Content ── */
-.main .block-container { padding: 1.5rem 2rem 3rem; max-width: 960px; }
+.main .block-container { padding: 1.5rem 2.2rem 3rem; max-width: 1100px; }
 
-/* ── Hero Banner ── */
 .hero-banner {
-    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #1e3a5f 100%);
-    border: 1px solid rgba(99,102,241,0.35);
-    border-radius: 20px;
-    padding: 2.5rem 2rem;
-    text-align: center;
-    margin-bottom: 2rem;
-    position: relative;
-    overflow: hidden;
-}
-.hero-banner::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: radial-gradient(ellipse at 50% 0%, rgba(139,92,246,0.25) 0%, transparent 70%);
-}
-.hero-banner h1 { font-size: 2.8rem; font-weight: 800; margin: 0 0 0.5rem;
-    background: linear-gradient(90deg, #a78bfa, #60a5fa, #34d399);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.hero-banner p { font-size: 1.1rem; color: #94a3b8; margin: 0; }
-
-/* ── Feature Cards ── */
-.feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1.5rem 0; }
-.feature-card {
-    background: rgba(30,27,75,0.5);
-    border: 1px solid rgba(99,102,241,0.25);
+    background: linear-gradient(135deg, rgba(182,255,43,0.08), rgba(125,255,58,0.06));
+    border: 1px solid rgba(182,255,43,0.2);
     border-radius: 16px;
-    padding: 1.4rem;
-    transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
-}
-.feature-card:hover { border-color: rgba(139,92,246,0.6); transform: translateY(-3px);
-    box-shadow: 0 8px 32px rgba(99,102,241,0.2); }
-.feature-card .icon { font-size: 2rem; margin-bottom: 0.6rem; }
-.feature-card h3 { font-size: 1rem; font-weight: 600; color: #a78bfa; margin: 0 0 0.4rem; }
-.feature-card p { font-size: 0.82rem; color: #94a3b8; margin: 0; line-height: 1.5; }
-
-/* ── Section Headers ── */
-.section-header {
-    display: flex; align-items: center; gap: 0.75rem;
-    margin: 1.5rem 0 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 2px solid rgba(99,102,241,0.3);
-}
-.section-header h2 { font-size: 1.5rem; font-weight: 700; margin: 0;
-    background: linear-gradient(90deg, #a78bfa, #60a5fa);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-
-/* ── Result Container ── */
-.result-box {
-    background: rgba(15,23,42,0.8);
-    border: 1px solid rgba(99,102,241,0.25);
-    border-radius: 16px;
-    padding: 1.5rem;
-    margin-top: 1rem;
-    backdrop-filter: blur(10px);
-}
-
-/* ── Quiz Card ── */
-.quiz-question {
-    background: rgba(30,27,75,0.5);
-    border: 1px solid rgba(99,102,241,0.3);
-    border-radius: 14px;
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1rem;
-}
-.quiz-question .q-num { font-size: 0.78rem; font-weight: 600; color: #a78bfa;
-    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.4rem; }
-.quiz-question .q-text { font-size: 1rem; font-weight: 500; color: #e2e8f0; margin-bottom: 0.75rem; }
-
-/* ── Score Bar ── */
-.score-display {
-    background: linear-gradient(135deg, #1e3a5f, #312e81);
-    border: 1px solid rgba(99,102,241,0.4);
-    border-radius: 16px;
-    padding: 1.5rem;
-    text-align: center;
-}
-.score-display h2 { font-size: 3rem; font-weight: 800; margin: 0;
-    background: linear-gradient(90deg, #34d399, #60a5fa);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.score-display p { font-size: 1rem; color: #94a3b8; margin: 0.5rem 0 0; }
-
-/* ── Flashcard ── */
-.flashcard-wrapper {
-    perspective: 1200px;
-    width: 100%; max-width: 640px;
-    margin: 1.5rem auto;
-    height: 260px;
-    cursor: pointer;
-}
-.flashcard-inner {
-    width: 100%; height: 100%;
-    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    transform-style: preserve-3d;
-    position: relative;
-}
-.flashcard-wrapper.flipped .flashcard-inner { transform: rotateY(180deg); }
-.flashcard-face {
-    position: absolute; inset: 0;
-    border-radius: 20px;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
     padding: 2rem;
-    backface-visibility: hidden;
-    text-align: center;
+    text-align: left;
+    margin-bottom: 1.6rem;
+    box-shadow: 0 12px 28px rgba(2,6,23,0.45);
 }
-.flashcard-front {
-    background: linear-gradient(135deg, #1e1b4b, #312e81);
-    border: 2px solid rgba(139,92,246,0.5);
-    box-shadow: 0 8px 32px rgba(99,102,241,0.25);
-}
-.flashcard-back {
-    background: linear-gradient(135deg, #0c3d2e, #1e3a5f);
-    border: 2px solid rgba(52,211,153,0.5);
-    box-shadow: 0 8px 32px rgba(52,211,153,0.15);
-    transform: rotateY(180deg);
-}
-.flashcard-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em;
-    text-transform: uppercase; margin-bottom: 1rem; opacity: 0.7; }
-.flashcard-front .flashcard-label { color: #a78bfa; }
-.flashcard-back .flashcard-label { color: #34d399; }
-.flashcard-content { font-size: 1.15rem; font-weight: 500; color: #e2e8f0; line-height: 1.6; }
+.hero-banner h1 { font-size: 2.2rem; font-weight: 800; margin: 0 0 0.5rem; color: var(--text); letter-spacing: 0.2px; }
+.hero-banner p { font-size: 1rem; color: var(--muted); margin: 0 0 1rem; }
+.hero-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 1.6rem; align-items: center; }
+.hero-actions { display:flex; gap:0.6rem; flex-wrap:wrap; margin-top:0.8rem; }
+.hero-tag { display:inline-flex; align-items:center; gap:0.4rem; font-size:0.78rem; color: var(--text); background: rgba(182,255,43,0.12); border:1px solid rgba(182,255,43,0.3); padding:0.25rem 0.6rem; border-radius:999px; }
+.hero-metrics { display:grid; grid-template-columns: repeat(3,1fr); gap:0.6rem; }
+.metric-card { background: var(--surface); border:1px solid var(--border); border-radius:12px; padding:0.9rem; }
+.metric-card .value { font-size:1.15rem; font-weight:700; color: var(--text); }
+.metric-card .label { font-size:0.78rem; color: var(--muted); margin-top:0.2rem; }
+.cta-button { background: linear-gradient(90deg, var(--accent), var(--accent-2)); color:#0b0d10; padding:0.6rem 1.1rem; border-radius:10px; font-weight:700; border:1px solid rgba(182,255,43,0.45); }
+.ghost-button { background: transparent; color: var(--text); padding:0.55rem 1.05rem; border-radius:10px; border:1px solid var(--border); }
 
-/* ── Chat ── */
-.chat-msg { display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: flex-start; }
-.chat-msg.user { flex-direction: row-reverse; }
-.chat-avatar {
-    width: 36px; height: 36px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1rem; flex-shrink: 0;
-}
-.chat-msg.user .chat-avatar { background: linear-gradient(135deg, #7c3aed, #4f46e5); }
-.chat-msg.assistant .chat-avatar { background: linear-gradient(135deg, #065f46, #1e3a5f); }
-.chat-bubble {
-    max-width: 80%;
-    padding: 0.85rem 1.1rem;
-    border-radius: 16px;
-    font-size: 0.9rem;
-    line-height: 1.6;
-}
-.chat-msg.user .chat-bubble {
-    background: linear-gradient(135deg, #4f46e5, #7c3aed);
-    color: #f0f4ff;
-    border-bottom-right-radius: 4px;
-}
-.chat-msg.assistant .chat-bubble {
-    background: rgba(30,27,75,0.7);
-    border: 1px solid rgba(99,102,241,0.25);
-    color: #e2e8f0;
-    border-bottom-left-radius: 4px;
-}
+.feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1rem 0; }
+.feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; transition: all 0.18s; }
+.feature-card:hover { transform: translateY(-3px); border-color: rgba(182,255,43,0.35); box-shadow: 0 14px 26px rgba(2,6,23,0.5); }
+.feature-card h3 { font-size: 0.98rem; font-weight: 600; color: var(--text); }
+.feature-card p { font-size: 0.9rem; color: var(--muted); }
+.feature-card .tag { display:inline-flex; align-items:center; gap:0.4rem; font-size:0.72rem; color: var(--muted); border:1px solid var(--border); padding:0.2rem 0.5rem; border-radius:999px; }
 
-/* ── Streamlit Widget Overrides ── */
+.home-section { margin-top: 1.4rem; }
+.home-title { font-size:1.2rem; font-weight:700; color: var(--text); margin-bottom:0.6rem; }
+.home-subtitle { font-size:0.9rem; color: var(--muted); margin-bottom:0.9rem; }
+.workflow { display:grid; grid-template-columns: repeat(3,1fr); gap:1rem; }
+.workflow-step { background: var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:1rem; }
+.workflow-step .step { font-size:0.75rem; color: var(--muted); }
+.workflow-step .title { font-size:0.95rem; font-weight:600; color: var(--text); margin-top:0.25rem; }
+.workflow-step .desc { font-size:0.85rem; color: var(--muted); margin-top:0.35rem; }
+
+.home-banner { background: var(--surface); border:1px solid var(--border); border-radius:14px; padding:1rem 1.2rem; display:flex; justify-content:space-between; align-items:center; gap:1rem; }
+.home-banner .note { font-size:0.9rem; color: var(--muted); }
+
+.section-header { display:flex; align-items:center; gap:0.6rem; margin:1rem 0 0.6rem; padding-bottom:0.5rem; border-bottom:1px solid var(--border); }
+.section-header h2{ font-size:1.28rem; font-weight:700; margin:0; color:var(--text); }
+
+.result-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; margin-top: 1rem; }
+
+.quiz-question { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom:0.9rem; }
+
+.flashcard-wrapper { max-width: 680px; height: 240px; margin: 1rem auto; }
+
+.chat-msg { display:flex; align-items:flex-start; gap:0.6rem; margin-bottom:0.75rem; }
+.chat-avatar { width: 32px; height: 32px; display:flex; align-items:center; justify-content:center; border-radius: 50%; background: rgba(182,255,43,0.12); color: var(--accent); font-size: 0.9rem; }
+.chat-bubble { padding: 0.75rem 1rem; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+.chat-msg.user .chat-bubble { background: rgba(182,255,43,0.14); border-color: rgba(182,255,43,0.35); }
+
 .stTextInput > div > div > input,
 .stTextArea > div > div > textarea,
-.stSelectbox > div > div {
-    background: rgba(15,23,42,0.9) !important;
-    border: 1px solid rgba(99,102,241,0.35) !important;
-    border-radius: 10px !important;
-    color: #e2e8f0 !important;
-}
-.stTextInput > div > div > input:focus,
-.stTextArea > div > div > textarea:focus {
-    border-color: rgba(139,92,246,0.7) !important;
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.15) !important;
-}
-.stButton > button {
-    background: linear-gradient(135deg, #4f46e5, #7c3aed) !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 10px !important;
-    padding: 0.6rem 1.4rem !important;
-    font-weight: 600 !important;
-    font-family: 'Inter', sans-serif !important;
-    transition: all 0.2s ease !important;
-}
-.stButton > button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 20px rgba(99,102,241,0.4) !important;
-}
-.stRadio > div { gap: 0.5rem; }
-.stRadio > div > label {
-    background: rgba(30,27,75,0.5);
-    border: 1px solid rgba(99,102,241,0.2);
-    border-radius: 10px;
-    padding: 0.4rem 0.9rem;
-    transition: all 0.2s;
-}
-.stRadio > div > label:hover { border-color: rgba(139,92,246,0.5); }
-.stSlider > div { color: #a78bfa; }
-div[data-baseweb="notification"] { border-radius: 12px !important; }
+.stSelectbox > div > div { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; color: var(--text) !important; }
+.stButton > button { background: linear-gradient(90deg, var(--accent), var(--accent-2)) !important; color: #0b0d10 !important; border-radius: 10px !important; padding: 0.56rem 1.1rem !important; font-weight:700 !important; border: 1px solid rgba(182,255,43,0.45) !important; }
+.stButton > button:hover{ transform: translateY(-1px) !important; box-shadow: 0 10px 24px rgba(182,255,43,0.25) !important; }
 
-/* ── Progress bar ── */
-.stProgress > div > div > div { background: linear-gradient(90deg, #a78bfa, #60a5fa) !important; border-radius: 4px; }
+.stProgress > div > div > div { background: var(--accent) !important; }
+.stSpinner > div { border-top-color: var(--accent) !important; }
 
-/* ── Spinner ── */
-.stSpinner > div { border-top-color: #a78bfa !important; }
+@media (max-width: 900px){
+  .hero-grid{ grid-template-columns: 1fr; }
+  .feature-grid{ grid-template-columns: repeat(2,1fr); }
+  .workflow{ grid-template-columns: 1fr; }
+  .hero-metrics{ grid-template-columns: repeat(3,1fr); }
+  .main .block-container{ padding-left: 1rem; padding-right:1rem; }
+}
+@media (max-width: 600px){
+  .feature-grid{ grid-template-columns: 1fr; }
+  .hero-banner h1{ font-size:1.6rem; }
+  .hero-metrics{ grid-template-columns: 1fr; }
+  .home-banner{ flex-direction: column; align-items:flex-start; }
+}
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0a0e1a; }
-::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.4); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.7); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -315,31 +221,19 @@ from modules.voice_engine import text_to_speech, speak, stop_audio
 with st.sidebar:
     st.markdown("""
     <div style='text-align:center; padding: 1rem 0 1.5rem;'>
-        <div style='font-size:2.8rem;'>🎓</div>
-        <div style='font-size:1.3rem; font-weight:800;
-            background: linear-gradient(90deg,#a78bfa,#60a5fa);
-            -webkit-background-clip:text; -webkit-text-fill-color:transparent;'>
-            StudyBuddy AI
+        <div style='font-size:1.35rem; font-weight:800; color:#0f172a; letter-spacing:0.2px;'>
+            StudyBuddy
         </div>
-        <div style='font-size:0.75rem; color:#64748b; margin-top:0.2rem;'>Powered by Llama 3.3 70B</div>
+        <div style='font-size:0.75rem; color:#64748b; margin-top:0.2rem;'>AI learning assistant</div>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("---")
     
     # Navigation
-    nav_options = [
-        "🏠 Home",
-        "💡 Explain",
-        "📄 Summarize",
-        "🎯 Quiz Me",
-        "🃏 Flashcards",
-        "💬 Chat Tutor"
-    ]
-    
     selected_page = st.radio(
         "Navigation",
-        nav_options,
+        NAV_OPTIONS,
         label_visibility="collapsed",
         key="nav_radio"
     )
@@ -377,58 +271,150 @@ if selected_page == "🏠 Home":
     # ══════════════════════════════════════════════════════
     st.markdown("""
     <div class='hero-banner'>
-        <h1>🎓 StudyBuddy AI</h1>
-        <p>Your personal AI-powered learning companion — understand, memorize, and master any subject.</p>
+        <div class='hero-grid'>
+            <div>
+                <div class='hero-tag'>⚡ Fast, focused study sessions</div>
+                <h1>StudyBuddy</h1>
+                <p>Understand faster with concise explanations, smart summaries, and targeted practice built for daily learning.</p>
+                <div class='home-subtitle'>Built for focused study sessions with clear outputs you can save and revisit.</div>
+            </div>
+            <div class='hero-metrics'>
+                <div class='metric-card'>
+                    <div class='value'>5 Modes</div>
+                    <div class='label'>Explain, summarize, quiz, flashcards, chat</div>
+                </div>
+                <div class='metric-card'>
+                    <div class='value'>PDF Ready</div>
+                    <div class='label'>Extract notes instantly</div>
+                </div>
+                <div class='metric-card'>
+                    <div class='value'>Voice</div>
+                    <div class='label'>Talk and listen hands‑free</div>
+                </div>
+            </div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("""
     <div class='feature-grid'>
         <div class='feature-card'>
-            <div class='icon'>💡</div>
-            <h3>Explain Topics</h3>
-            <p>Get crystal-clear explanations at your level — from ELI5 to advanced academic depth.</p>
+            <div class='tag'>💡 Explain</div>
+            <h3>Clear explanations</h3>
+            <p>Pick your level and get structured, easy‑to‑follow answers.</p>
         </div>
         <div class='feature-card'>
-            <div class='icon'>📄</div>
-            <h3>Summarize Notes</h3>
-            <p>Paste your notes or upload a PDF. Get a concise summary, key points, and a glossary.</p>
+            <div class='tag'>📝 Summarize</div>
+            <h3>Shorter notes</h3>
+            <p>Turn long notes or PDFs into concise, actionable summaries.</p>
         </div>
         <div class='feature-card'>
-            <div class='icon'>🎯</div>
-            <h3>Quiz Generator</h3>
-            <p>Generate MCQs, True/False, or Short Answer questions on any topic. Track your score.</p>
+            <div class='tag'>🎯 Quiz</div>
+            <h3>Targeted practice</h3>
+            <p>Generate quizzes and measure how well you understand topics.</p>
         </div>
         <div class='feature-card'>
-            <div class='icon'>🃏</div>
-            <h3>Flashcards</h3>
-            <p>Create interactive flip flashcards for rapid memorization of key concepts and terms.</p>
+            <div class='tag'>🗂️ Flashcards</div>
+            <h3>Active recall</h3>
+            <p>Memorize key terms with fast, flip‑style cards.</p>
         </div>
         <div class='feature-card'>
-            <div class='icon'>💬</div>
-            <h3>Chat Tutor</h3>
-            <p>Have a natural conversation with your AI tutor. Ask follow‑ups, get examples, clarify doubts.</p>
+            <div class='tag'>💬 Chat</div>
+            <h3>Guided learning</h3>
+            <p>Ask follow‑ups and get step‑by‑step tutoring.</p>
         </div>
         <div class='feature-card'>
-            <div class='icon'>🚀</div>
-            <h3>Free & Fast</h3>
-            <p>Powered by Llama 3.3 70B via Groq's ultra-fast inference. Free API key at console.groq.com.</p>
+            <div class='tag'>🔊 Voice</div>
+            <h3>Hands‑free mode</h3>
+            <p>Speak your question and listen to the response.</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.markdown("### 📊 Capabilities")
+    st.markdown("<div class='home-section'>", unsafe_allow_html=True)
+    st.markdown("<div class='home-title'>How it works</div>", unsafe_allow_html=True)
+    st.markdown("<div class='home-subtitle'>A simple flow designed for quick study sessions.</div>", unsafe_allow_html=True)
     st.markdown("""
-- ✅ 70B parameter model
-- ✅ Multi-turn conversation
-- ✅ PDF text extraction
-- ✅ JSON-structured output
-- ✅ Context-aware answers
-- ✅ Live Voice Interaction (New!)
-    """)
+    <div class='workflow'>
+        <div class='workflow-step'>
+            <div class='step'>Step 1</div>
+            <div class='title'>Drop your topic or notes</div>
+            <div class='desc'>Type a question, paste notes, or upload a PDF.</div>
+        </div>
+        <div class='workflow-step'>
+            <div class='step'>Step 2</div>
+            <div class='title'>Choose a mode</div>
+            <div class='desc'>Explain, summarize, quiz, flashcards, or chat.</div>
+        </div>
+        <div class='workflow-step'>
+            <div class='step'>Step 3</div>
+            <div class='title'>Review and retain</div>
+            <div class='desc'>Save results, practice, and come back anytime.</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-elif selected_page == "💡 Explain":
+    st.markdown("<div class='home-section'>", unsafe_allow_html=True)
+    st.markdown("<div class='home-title'>Why students use StudyBuddy</div>", unsafe_allow_html=True)
+    st.markdown("<div class='home-subtitle'>Designed to reduce study friction and keep you consistent.</div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div class='feature-grid'>
+        <div class='feature-card'>
+            <div class='tag'>✅ Clarity</div>
+            <h3>Structured answers</h3>
+            <p>Responses are organized with headings, key points, and concise explanations.</p>
+        </div>
+        <div class='feature-card'>
+            <div class='tag'>⚡ Speed</div>
+            <h3>Quick feedback</h3>
+            <p>Get results fast so you can move to practice without delays.</p>
+        </div>
+        <div class='feature-card'>
+            <div class='tag'>🔁 Consistency</div>
+            <h3>Repeatable workflow</h3>
+            <p>Use the same steps across topics to build steady habits.</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<div class='home-section'>", unsafe_allow_html=True)
+    st.markdown("""
+    <div class='home-banner'>
+        <div>
+            <div class='home-title'>Study smarter today</div>
+            <div class='note'>Switch between modes without losing your progress. Save results and revisit anytime.</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<div class='home-section'>", unsafe_allow_html=True)
+    st.markdown("<div class='home-title'>Getting the best results</div>", unsafe_allow_html=True)
+    st.markdown("<div class='home-subtitle'>A few quick tips to improve quality and accuracy.</div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div class='workflow'>
+        <div class='workflow-step'>
+            <div class='step'>Tip 1</div>
+            <div class='title'>Be specific</div>
+            <div class='desc'>Include the topic scope, level, and any constraints.</div>
+        </div>
+        <div class='workflow-step'>
+            <div class='step'>Tip 2</div>
+            <div class='title'>Use short chunks</div>
+            <div class='desc'>Split large notes for clearer summaries and quizzes.</div>
+        </div>
+        <div class='workflow-step'>
+            <div class='step'>Tip 3</div>
+            <div class='title'>Review and repeat</div>
+            <div class='desc'>Revisit flashcards or quizzes for stronger retention.</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+elif selected_page == "🧠 Explain":
     # ══════════════════════════════════════════════════════
     # 💡 EXPLAIN TOPIC
     # ══════════════════════════════════════════════════════
@@ -498,7 +484,7 @@ elif selected_page == "💡 Explain":
                  """
                  components.html(share_js, height=50)
 
-elif selected_page == "📄 Summarize":
+elif selected_page == "📝 Summarize":
     # ══════════════════════════════════════════════════════
     # 📄 SUMMARIZE NOTES
     # ══════════════════════════════════════════════════════
@@ -701,7 +687,7 @@ elif selected_page == "🎯 Quiz Me":
             st.session_state.quiz_answers = {}
             st.rerun()
 
-elif selected_page == "🃏 Flashcards":
+elif selected_page == "🗂️ Flashcards":
     # ══════════════════════════════════════════════════════
     # 🃏 FLASHCARDS
     # ══════════════════════════════════════════════════════
