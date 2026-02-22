@@ -4,6 +4,7 @@ import os
 import base64
 import re
 import streamlit.components.v1 as components
+import html
 
 def clean_text_for_speech(text):
     """Remove markdown syntax for cleaner speech output."""
@@ -27,7 +28,7 @@ def clean_text_for_speech(text):
 # ─── Page Config ────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="StudyBuddy AI",
-    page_icon="🎓",
+    page_icon="assets/studybuddy-icon.svg",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -41,20 +42,20 @@ if "summarize_text" not in st.session_state: st.session_state.summarize_text = "
 
 # ─── Navigation Setup ───
 NAV_OPTIONS = [
-    "🏠 Home",
-    "🧠 Explain",
-    "📝 Summarize",
-    "🎯 Quiz Me",
-    "🗂️ Flashcards",
-    "💬 Chat Tutor"
+    "Home",
+    "Explain",
+    "Summarize",
+    "Quiz Me",
+    "Flashcards",
+    "Chat Tutor"
 ]
 NAV_SLUGS = {
-    "home": "🏠 Home",
-    "explain": "🧠 Explain",
-    "summarize": "📝 Summarize",
-    "quiz": "🎯 Quiz Me",
-    "flashcards": "🗂️ Flashcards",
-    "chat": "💬 Chat Tutor",
+    "home": "Home",
+    "explain": "Explain",
+    "summarize": "Summarize",
+    "quiz": "Quiz Me",
+    "flashcards": "Flashcards",
+    "chat": "Chat Tutor",
 }
 
 try:
@@ -108,6 +109,33 @@ html, body, .stApp {
     gap: 0.6rem;
     transition: all 0.18s ease;
     font-weight: 600;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label::before{
+    content: "";
+    width: 16px;
+    height: 16px;
+    display: inline-block;
+    background-size: 16px 16px;
+    background-repeat: no-repeat;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35));
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:nth-of-type(1)::before{
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B6FF2B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 10.5 12 3l9 7.5'/><path d='M5 10v9h14v-9'/></svg>");
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:nth-of-type(2)::before{
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B6FF2B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 18h6'/><path d='M10 22h4'/><path d='M12 2a7 7 0 0 1 4 12c-.8.8-1.3 1.8-1.5 3h-5c-.2-1.2-.7-2.2-1.5-3A7 7 0 0 1 12 2z'/></svg>");
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:nth-of-type(3)::before{
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B6FF2B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 3h9l3 3v15H6z'/><path d='M15 3v3h3'/><path d='M8 13h8'/><path d='M8 17h8'/></svg>");
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:nth-of-type(4)::before{
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B6FF2B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><path d='M12 7v5l3 3'/></svg>");
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:nth-of-type(5)::before{
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B6FF2B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='14' rx='2'/><path d='M7 8h10'/><path d='M7 12h6'/></svg>");
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:nth-of-type(6)::before{
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B6FF2B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z'/></svg>");
 }
 [data-testid="stSidebar"] [data-testid="stRadio"] label:hover{
     background: rgba(182,255,43,0.12);
@@ -167,13 +195,54 @@ button { cursor: pointer !important; }
 .home-banner .note { font-size:0.9rem; color: var(--muted); }
 
 .section-header { display:flex; align-items:center; gap:0.6rem; margin:1rem 0 0.6rem; padding-bottom:0.5rem; border-bottom:1px solid var(--border); }
+.section-icon { width:18px; height:18px; display:inline-block; background-size:18px 18px; background-repeat:no-repeat; }
+.section-icon.explain { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B6FF2B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 18h6'/><path d='M10 22h4'/><path d='M12 2a7 7 0 0 1 4 12c-.8.8-1.3 1.8-1.5 3h-5c-.2-1.2-.7-2.2-1.5-3A7 7 0 0 1 12 2z'/></svg>"); }
+.section-icon.summarize { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B6FF2B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 3h9l3 3v15H6z'/><path d='M15 3v3h3'/><path d='M8 13h8'/><path d='M8 17h8'/></svg>"); }
+.section-icon.quiz { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B6FF2B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><path d='M12 7v5l3 3'/></svg>"); }
+.section-icon.flashcards { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B6FF2B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='14' rx='2'/><path d='M7 8h10'/><path d='M7 12h6'/></svg>"); }
+.section-icon.chat { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B6FF2B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z'/></svg>"); }
 .section-header h2{ font-size:1.28rem; font-weight:700; margin:0; color:var(--text); }
 
 .result-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; margin-top: 1rem; }
 
 .quiz-question { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom:0.9rem; }
 
-.flashcard-wrapper { max-width: 680px; height: 240px; margin: 1rem auto; }
+.flashcard-wrapper { max-width: 720px; height: 280px; margin: 1.2rem auto; }
+.flashcard-wrapper { perspective: 1000px; }
+.flashcard-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.6s ease; }
+.flashcard-wrapper.flipped .flashcard-inner { transform: rotateY(180deg); }
+.flashcard-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.4rem 1.6rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.7rem;
+}
+.flashcard-front { }
+.flashcard-back { transform: rotateY(180deg); }
+.flashcard-label {
+    font-size: 0.78rem;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.flashcard-content {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.45;
+    max-height: 9.5rem;
+    overflow-y: auto;
+    padding-right: 0.2rem;
+}
+.flashcard-content::-webkit-scrollbar { width: 6px; }
+.flashcard-content::-webkit-scrollbar-thumb { background: rgba(182,255,43,0.35); border-radius: 6px; }
 
 .chat-msg { display:flex; align-items:flex-start; gap:0.6rem; margin-bottom:0.75rem; }
 .chat-avatar { width: 32px; height: 32px; display:flex; align-items:center; justify-content:center; border-radius: 50%; background: rgba(182,255,43,0.12); color: var(--accent); font-size: 0.9rem; }
@@ -183,6 +252,10 @@ button { cursor: pointer !important; }
 .stTextInput > div > div > input,
 .stTextArea > div > div > textarea,
 .stSelectbox > div > div { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; color: var(--text) !important; }
+.stSelectbox div[role="button"],
+.stSelectbox span,
+[data-baseweb="select"] * { cursor: pointer !important; }
+.stRadio [data-baseweb="radio"] * { cursor: pointer !important; }
 .stButton > button { background: linear-gradient(90deg, var(--accent), var(--accent-2)) !important; color: #0b0d10 !important; border-radius: 10px !important; padding: 0.56rem 1.1rem !important; font-weight:700 !important; border: 1px solid rgba(182,255,43,0.45) !important; }
 .stButton > button:hover{ transform: translateY(-1px) !important; box-shadow: 0 10px 24px rgba(182,255,43,0.25) !important; }
 
@@ -219,12 +292,13 @@ from modules.voice_engine import text_to_speech, speak, stop_audio
 
 # ─── Sidebar ────────────────────────────────────────────────────────────────
 with st.sidebar:
+    st.markdown("<div style='text-align:center; padding: 1rem 0 0.5rem;'>", unsafe_allow_html=True)
+    st.image("assets/studybuddy-icon.svg", width=42)
     st.markdown("""
-    <div style='text-align:center; padding: 1rem 0 1.5rem;'>
-        <div style='font-size:1.35rem; font-weight:800; color:#0f172a; letter-spacing:0.2px;'>
+        <div style='font-size:1.15rem; font-weight:800; color:#e6e9ef; letter-spacing:0.2px;'>
             StudyBuddy
         </div>
-        <div style='font-size:0.75rem; color:#64748b; margin-top:0.2rem;'>AI learning assistant</div>
+        <div style='font-size:0.75rem; color:#a0a8b6; margin-top:0.2rem;'>AI learning assistant</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -265,7 +339,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 # ─── Routing ────────────────────────────────────────────────────────────────
-if selected_page == "🏠 Home":
+if selected_page == "Home":
     # ══════════════════════════════════════════════════════
     # 🏠 HOME
     # ══════════════════════════════════════════════════════
@@ -414,11 +488,11 @@ if selected_page == "🏠 Home":
     """, unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-elif selected_page == "🧠 Explain":
+elif selected_page == "Explain":
     # ══════════════════════════════════════════════════════
     # 💡 EXPLAIN TOPIC
     # ══════════════════════════════════════════════════════
-    st.markdown("<div class='section-header'><span>💡</span><h2>Explain Any Topic</h2></div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'><span class='section-icon explain'></span><h2>Explain Any Topic</h2></div>", unsafe_allow_html=True)
 
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -484,11 +558,11 @@ elif selected_page == "🧠 Explain":
                  """
                  components.html(share_js, height=50)
 
-elif selected_page == "📝 Summarize":
+elif selected_page == "Summarize":
     # ══════════════════════════════════════════════════════
     # 📄 SUMMARIZE NOTES
     # ══════════════════════════════════════════════════════
-    st.markdown("<div class='section-header'><span>📄</span><h2>Summarize Your Notes</h2></div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'><span class='section-icon summarize'></span><h2>Summarize Your Notes</h2></div>", unsafe_allow_html=True)
 
     input_mode = st.radio("Input Method", ["✏️ Type / Paste Text", "📎 Upload PDF"], horizontal=True, key="summ_mode")
 
@@ -561,11 +635,11 @@ elif selected_page == "📝 Summarize":
                  """
                  components.html(share_js, height=50)
 
-elif selected_page == "🎯 Quiz Me":
+elif selected_page == "Quiz Me":
     # ══════════════════════════════════════════════════════
     # 🎯 QUIZ ME
     # ══════════════════════════════════════════════════════
-    st.markdown("<div class='section-header'><span>🎯</span><h2>Quiz Generator</h2></div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'><span class='section-icon quiz'></span><h2>Quiz Generator</h2></div>", unsafe_allow_html=True)
 
     # Session state for quiz
     if "quiz_questions" not in st.session_state:
@@ -605,7 +679,7 @@ elif selected_page == "🎯 Quiz Me":
         questions = st.session_state.quiz_questions
 
         for i, q in enumerate(questions):
-            qtype = q.get("type", "")
+            qtype = str(q.get("type", "")).lower().strip()
             question_text = q.get("question", f"Question {i+1}")
 
             st.markdown(f"""
@@ -616,12 +690,15 @@ elif selected_page == "🎯 Quiz Me":
             """, unsafe_allow_html=True)
 
             key = f"quiz_ans_{i}"
-            if qtype == "mcq":
+            if qtype in ["mcq", "multiple choice", "multiple-choice"]:
                 options = q.get("options", [])
+                if not options:
+                    st.warning("This question is missing options. Try regenerating the quiz.")
+                    continue
                 answer = st.radio(f"Options for Q{i+1}", options, key=key, index=None, label_visibility="collapsed")
                 if answer:
-                    st.session_state.quiz_answers[i] = answer[0]  # first char = letter
-            elif qtype == "tf":
+                    st.session_state.quiz_answers[i] = answer
+            elif qtype in ["tf", "true/false", "true-false"]:
                 answer = st.radio(f"True/False for Q{i+1}", ["True", "False"], key=key, index=None, label_visibility="collapsed")
                 if answer:
                     st.session_state.quiz_answers[i] = answer
@@ -641,16 +718,27 @@ elif selected_page == "🎯 Quiz Me":
         answers = st.session_state.quiz_answers
         score = 0
 
+        def _extract_letter(value: str):
+            if not value:
+                return None
+            match = re.search(r"[A-D]", str(value).upper())
+            return match.group(0) if match else None
+
         for i, q in enumerate(questions):
-            qtype = q.get("type", "")
+            qtype = str(q.get("type", "")).lower().strip()
             correct = str(q.get("answer", "")).strip()
             user_ans = str(answers.get(i, "")).strip()
             explanation = q.get("explanation", "")
 
             is_correct = False
-            if qtype == "mcq":
-                is_correct = user_ans.upper() == correct.upper()
-            elif qtype == "tf":
+            if qtype in ["mcq", "multiple choice", "multiple-choice"]:
+                correct_letter = _extract_letter(correct)
+                user_letter = _extract_letter(user_ans)
+                if correct_letter and user_letter:
+                    is_correct = user_letter == correct_letter
+                else:
+                    is_correct = user_ans.lower().strip() == correct.lower().strip()
+            elif qtype in ["tf", "true/false", "true-false"]:
                 is_correct = user_ans.lower() == correct.lower()
             else:
                 is_correct = user_ans.lower().strip() == correct.lower().strip()
@@ -667,7 +755,7 @@ elif selected_page == "🎯 Quiz Me":
                 <div style='font-weight:600; margin-bottom:0.4rem;'>{icon} Q{i+1}: {q.get("question","")}</div>
                 <div style='font-size:0.85rem; color:{color};'>Correct Answer: <b>{correct}</b></div>
                 {f"<div style='font-size:0.85rem; color:#94a3b8; margin-top:0.3rem;'>Your answer: {user_ans}</div>" if not is_correct else ""}
-                {f"<div style='font-size:0.82rem; color:#64748b; margin-top:0.4rem; font-style:italic;'>{explanation}</div>" if explanation else ""}
+                {f"<div style='font-size:0.82rem; color:#64748b; margin-top:0.4rem; font-style:italic;'>{explanation}</div>" if (explanation and not is_correct) else ""}
             </div>
             """, unsafe_allow_html=True)
 
@@ -687,11 +775,11 @@ elif selected_page == "🎯 Quiz Me":
             st.session_state.quiz_answers = {}
             st.rerun()
 
-elif selected_page == "🗂️ Flashcards":
+elif selected_page == "Flashcards":
     # ══════════════════════════════════════════════════════
     # 🃏 FLASHCARDS
     # ══════════════════════════════════════════════════════
-    st.markdown("<div class='section-header'><span>🃏</span><h2>Flashcard Generator</h2></div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'><span class='section-icon flashcards'></span><h2>Flashcard Generator</h2></div>", unsafe_allow_html=True)
 
     if "flashcards" not in st.session_state:
         st.session_state.flashcards = []
@@ -732,17 +820,20 @@ elif selected_page == "🗂️ Flashcards":
         st.markdown("---")
         flip_class = "flipped" if flipped else ""
 
+        front_text = html.escape(str(card.get("front", "")).strip()) or "No question provided."
+        back_text = html.escape(str(card.get("back", "")).strip()) or "No answer provided."
+
         st.markdown(f"""
         <div class='flashcard-wrapper {flip_class}' id='fc'>
             <div class='flashcard-inner'>
                 <div class='flashcard-face flashcard-front'>
-                    <div class='flashcard-label'>❓ Question / Term</div>
-                    <div class='flashcard-content'>{card.get("front","")}</div>
-                    <div style='font-size:0.72rem; color:#64748b; margin-top:1rem;'>Click button below to flip ↓</div>
+                    <div class='flashcard-label'>Question</div>
+                    <div class='flashcard-content'>{front_text}</div>
+                    <div style='font-size:0.72rem; color:#64748b; margin-top:1rem;'>Use the button below to view the answer.</div>
                 </div>
                 <div class='flashcard-face flashcard-back'>
-                    <div class='flashcard-label'>✅ Answer / Definition</div>
-                    <div class='flashcard-content'>{card.get("back","")}</div>
+                    <div class='flashcard-label'>Answer</div>
+                    <div class='flashcard-content'>{back_text}</div>
                 </div>
             </div>
         </div>
@@ -780,11 +871,11 @@ elif selected_page == "🗂️ Flashcards":
                 </div>
                 """, unsafe_allow_html=True)
 
-elif selected_page == "💬 Chat Tutor":
+elif selected_page == "Chat Tutor":
     # ══════════════════════════════════════════════════════
     # 💬 CHAT TUTOR (With Voice)
     # ══════════════════════════════════════════════════════
-    st.markdown("<div class='section-header'><span>💬</span><h2>Chat Tutor</h2></div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'><span class='section-icon chat'></span><h2>Chat Tutor</h2></div>", unsafe_allow_html=True)
 
     # ─── Session State Init ───
     if "chat_history" not in st.session_state:
