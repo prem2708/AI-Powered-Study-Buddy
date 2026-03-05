@@ -52,6 +52,7 @@ st.set_page_config(
 if "user" not in st.session_state:
     st.session_state["user"] = None
 
+
 # Attempt hydration from HTTP Cookies if not in session state
 if st.session_state["user"] is None:
     # `st.context.cookies` is available instantly on page load!
@@ -106,10 +107,14 @@ def show_login_dialog():
                 document.cookie = "sb_refresh_token={res.session.refresh_token}; path=/; max-age=2592000";
             </script>
             """, height=0, width=0)
-            time.sleep(0.5) 
+            st.success("Logged in successfully!")
+            time.sleep(0.8) 
             st.rerun()
         except Exception as e:
             st.error(f"Login failed: {e}")
+    # link to registration inside dialog
+    st.markdown("<div style='text-align:center; margin-top:1rem;'>Don't have an account? "
+                "<a href='?dialog=register'>Sign up</a></div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 @st.dialog("Register")
@@ -138,11 +143,25 @@ def show_register_dialog():
                 document.cookie = "sb_refresh_token={res.session.refresh_token}; path=/; max-age=2592000";
             </script>
             """, height=0, width=0)
-            time.sleep(0.5) 
+            st.success(f"Registration successful! Logged in as {name}.")
+            time.sleep(0.8) 
             st.rerun()
         except Exception as e:
             st.error(f"Registration failed: {e}")
+    # link to login inside dialog
+    st.markdown("<div style='text-align:center; margin-top:1rem;'>Already have an account? "
+                "<a href='?dialog=login'>Sign in</a></div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
+
+# check for ?dialog=login/register links
+# older Streamlit versions expose query parameters via st.query_params
+params = st.query_params if not hasattr(st, "experimental_get_query_params") else st.experimental_get_query_params()
+if params.get("dialog"):
+    dlg = params.get("dialog")[0]
+    if dlg == "login":
+        show_login_dialog()
+    elif dlg == "register":
+        show_register_dialog()
 
 
 
@@ -495,10 +514,17 @@ with st.sidebar:
             Sign in to access your personal study space, save notes, and keep your history.
         </div>
         """, unsafe_allow_html=True)
+        # two distinct buttons instead of a single combined call-to-action
         st.markdown("<div class='sidebar-cta'>", unsafe_allow_html=True)
-        if st.button("🚀 Sign In / Register", key="btn_sidebar_login", use_container_width=True):
-            show_login_dialog()
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔑 Log In", key="btn_sidebar_signin", use_container_width=True):
+                show_login_dialog()
+        with col2:
+            if st.button("📝 Register", key="btn_sidebar_register", use_container_width=True):
+                show_register_dialog()
         st.markdown("</div>", unsafe_allow_html=True)
+
         st.markdown("---")
 
     
