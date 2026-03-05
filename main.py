@@ -5,6 +5,21 @@ import base64
 import re
 import streamlit.components.v1 as components
 import html
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ─── Database & Auth helpers ────────────────────────────────────────────────────
+from modules.database import (
+    auth_sign_up, auth_sign_in, auth_sign_out, restore_session,
+    upsert_user_profile,
+    save_note, get_notes, delete_note,
+    save_quiz_result, get_quiz_history,
+    save_flashcard_set, get_flashcard_sets,
+    save_chat_history, get_chat_history,
+)
+import time
+
 
 def clean_text_for_speech(text):
     """Remove markdown syntax for cleaner speech output."""
@@ -32,6 +47,104 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ─── Auth State Hydration (Zero-Lag via native Cookies) ────────────
+if "user" not in st.session_state:
+    st.session_state["user"] = None
+
+# Attempt hydration from HTTP Cookies if not in session state
+if st.session_state["user"] is None:
+    # `st.context.cookies` is available instantly on page load!
+    cookies = st.context.cookies
+    access_token = cookies.get("sb_access_token")
+    refresh_token = cookies.get("sb_refresh_token")
+    
+    if access_token and refresh_token:
+        res = restore_session(access_token, refresh_token)
+        if res and res.user:
+            st.session_state["user"] = res
+
+_IS_LOGGED_IN = st.session_state["user"] is not None
+
+# Set up user vars only when logged in
+if _IS_LOGGED_IN:
+    u = st.session_state["user"]
+    _UID   = u.user.id
+    _NAME  = u.user.user_metadata.get("full_name", "User")
+    _EMAIL = u.user.email
+    # Sync to Supabase once per session
+    if not st.session_state.get("_profile_synced"):
+        upsert_user_profile(_UID, _EMAIL, _NAME)
+        history = get_chat_history(_UID)
+        if history and not st.session_state.get("chat_history"):
+            st.session_state["chat_history"] = history
+        st.session_state["_profile_synced"] = True
+else:
+    _UID, _NAME, _EMAIL = "", "", ""
+
+
+@st.dialog("Log In")
+def show_login_dialog():
+    # outer container for nicer dialog styling
+    st.markdown("<div class='auth-dialog'>", unsafe_allow_html=True)
+    st.markdown("<h2>🔑 Welcome Back</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center;color:var(--muted);margin-bottom:1rem;'>Access your StudyBuddy account</p>", unsafe_allow_html=True)
+
+    email = st.text_input("Email", key="login_email")
+    password = st.text_input("Password", type="password", key="login_pass")
+    if st.button("Sign In", use_container_width=True, type="primary"):
+        if not email or not password:
+            st.error("Please enter email and password.")
+            return
+        try:
+            res = auth_sign_in(email, password)
+            st.session_state["user"] = res
+            # Save tokens to cookies via JS injection
+            components.html(f"""
+            <script>
+                document.cookie = "sb_access_token={res.session.access_token}; path=/; max-age=2592000";
+                document.cookie = "sb_refresh_token={res.session.refresh_token}; path=/; max-age=2592000";
+            </script>
+            """, height=0, width=0)
+            time.sleep(0.5) 
+            st.rerun()
+        except Exception as e:
+            st.error(f"Login failed: {e}")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+@st.dialog("Register")
+def show_register_dialog():
+    st.markdown("<div class='auth-dialog'>", unsafe_allow_html=True)
+    st.markdown("<h2>📝 Create Account</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center;color:var(--muted);margin-bottom:1rem;'>Join StudyBuddy today</p>", unsafe_allow_html=True)
+
+    name = st.text_input("Full Name", key="reg_name")
+    email = st.text_input("Email", key="reg_email")
+    password = st.text_input("Password", type="password", key="reg_pass")
+    if st.button("Sign Up", use_container_width=True, type="primary"):
+        if not email or not password or not name:
+            st.error("Please fill in all fields.")
+            return
+        if len(password) < 6:
+            st.error("Password must be at least 6 characters.")
+            return
+        try:
+            res = auth_sign_up(email, password, name)
+            st.session_state["user"] = res
+            # Save tokens to cookies via JS injection
+            components.html(f"""
+            <script>
+                document.cookie = "sb_access_token={res.session.access_token}; path=/; max-age=2592000";
+                document.cookie = "sb_refresh_token={res.session.refresh_token}; path=/; max-age=2592000";
+            </script>
+            """, height=0, width=0)
+            time.sleep(0.5) 
+            st.rerun()
+        except Exception as e:
+            st.error(f"Registration failed: {e}")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 
 # ─── Session State Init ───
 if "chat_history" not in st.session_state: st.session_state.chat_history = []
@@ -149,6 +262,52 @@ html, body, .stApp {
     box-shadow: inset 0 0 0 1px rgba(182,255,43,0.35);
     border-radius: 10px;
 }
+
+/* custom styles for login/register buttons */
+.home-cta button, .sidebar-cta button {
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    color:#0b0d10;
+    padding:0.75rem 1.25rem;
+    border-radius:12px;
+    font-weight:700;
+    border:none;
+    transition: all 0.18s ease;
+}
+.home-cta button:hover, .sidebar-cta button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* dialog/form enhancements */
+.auth-dialog {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.8rem 1.6rem;
+    max-width: 400px;
+    margin: auto;
+}
+.stDialog h2, .stDialog h3 {
+    color: var(--accent);
+    text-align: center;
+    margin-bottom: 1rem;
+}
+.stDialog .stTextInput>div>div>input {
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 0.6rem;
+}
+.stDialog .stButton>button {
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    color: #0b0d10;
+    border: none;
+    padding: 0.75rem;
+    border-radius: 12px;
+    font-weight: 700;
+    width: 100%;
+}
+.stDialog .stButton>button:hover { opacity: 0.9; }
 
 button { cursor: pointer !important; }
 
@@ -303,6 +462,45 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.markdown("---")
+
+    if _IS_LOGGED_IN:
+        # ── Logged-in user info + Logout ──────────────────────────────────────────
+        st.markdown(f"""
+        <div style='background:rgba(182,255,43,0.07); border:1px solid rgba(182,255,43,0.2);
+            border-radius:10px; padding:0.65rem 0.8rem; margin-bottom:0.4rem;'>
+            <div style='font-size:0.82rem; font-weight:600; color:#e6e9ef;'>👤 {html.escape(_NAME)}</div>
+            <div style='font-size:0.72rem; color:#64748b; margin-top:0.15rem;'>{html.escape(_EMAIL)}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("🚪 Logout", key="btn_logout", use_container_width=True):
+            # Save chat before logging out
+            if st.session_state.get("chat_history"):
+                save_chat_history(_UID, st.session_state.chat_history)
+            auth_sign_out()
+            st.session_state.clear()
+            components.html("""
+            <script>
+                document.cookie = "sb_access_token=; path=/; max-age=0";
+                document.cookie = "sb_refresh_token=; path=/; max-age=0";
+            </script>
+            """, height=0, width=0)
+            time.sleep(0.5)
+            st.rerun()
+
+        st.markdown("---")
+    else:
+        st.markdown("""
+        <div style='font-size:0.85rem; color:#a0a8b6; text-align:center; margin-bottom:1rem;'>
+            Sign in to access your personal study space, save notes, and keep your history.
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<div class='sidebar-cta'>", unsafe_allow_html=True)
+        if st.button("🚀 Sign In / Register", key="btn_sidebar_login", use_container_width=True):
+            show_login_dialog()
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("---")
+
     
     # Navigation
     selected_page = st.radio(
@@ -333,8 +531,8 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("""
     <div style='font-size:0.72rem; color:#475569; text-align:center;'>
-    Built with ❤️ using Streamlit + Groq<br>
-    Free tier • No data stored
+    Built with ❤️ using Streamlit + Groq + Supabase<br>
+    Powered by Clerk Auth
     </div>
     """, unsafe_allow_html=True)
 
@@ -369,6 +567,22 @@ if selected_page == "Home":
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+    if not _IS_LOGGED_IN:
+        st.markdown("<div style='text-align: center; margin: 2rem 0;'><b style='font-size: 1.2rem;'>Start your session:</b></div>", unsafe_allow_html=True)
+        col_l, col_r, _ = st.columns([1, 1, 2])
+        with col_l:
+            st.markdown("<div class='home-cta'>", unsafe_allow_html=True)
+            if st.button("Log In", key="btn_home_login", use_container_width=True):
+                show_login_dialog()
+            st.markdown("</div>", unsafe_allow_html=True)
+        with col_r:
+            st.markdown("<div class='home-cta'>", unsafe_allow_html=True)
+            if st.button("Register", key="btn_home_register", use_container_width=True):
+                show_register_dialog()
+            st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<br><hr>", unsafe_allow_html=True)
+
 
     st.markdown("""
     <div class='feature-grid'>
@@ -488,11 +702,24 @@ if selected_page == "Home":
     """, unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
+# ─── GUARD: Force login for protected pages ────────────────────────────────
+if not _IS_LOGGED_IN and selected_page != "Home":
+    st.warning("⚠️ You need to sign in to access this feature.")
+    st.markdown("<br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<div class='home-cta'>", unsafe_allow_html=True)
+        if st.button("🚀 Sign In", key="btn_guard_login", use_container_width=True):
+            show_login_dialog()
+        st.markdown("</div>", unsafe_allow_html=True)
+    st.stop()
+
 elif selected_page == "Explain":
     # ══════════════════════════════════════════════════════
     # 💡 EXPLAIN TOPIC
     # ══════════════════════════════════════════════════════
     st.markdown("<div class='section-header'><span class='section-icon explain'></span><h2>Explain Any Topic</h2></div>", unsafe_allow_html=True)
+
 
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -530,17 +757,21 @@ elif selected_page == "Explain":
         st.markdown(result)
         st.markdown("</div>", unsafe_allow_html=True)
             
-        # --- Export Options ---
-        col_d, col_c = st.columns([1, 1])
+        # --- Actions ---
+        col_d, col_s, col_c = st.columns([1, 1, 1])
         with col_d:
             st.download_button(
-                "📥 Download Explanation", 
+                "📥 Download", 
                 result, 
                 file_name=f"Explanation_{topic_input.replace(' ', '_')}.md",
                 mime="text/markdown"
             )
+        with col_s:
+            if st.button("💾 Save to Library", key="btn_save_explain"):
+                title = f"Explain: {topic_input[:60]}"
+                if save_note(_UID, title, result):
+                    st.success("✅ Saved!")
         with col_c:
-                 # Share Button (JS)
                  share_js = f"""
                  <script>
                  async function share() {{
@@ -557,6 +788,21 @@ elif selected_page == "Explain":
                  <button onclick="share()" style="background:none; border:1px solid #4b5563; border-radius:5px; padding:5px 10px; color:white; font-size:1rem; cursor:pointer;" title="Share">📤 Share</button>
                  """
                  components.html(share_js, height=50)
+
+    # --- Saved Explanations Library ---
+    saved_notes = get_notes(_UID)
+    explain_notes = [n for n in saved_notes if n.get("title", "").startswith("Explain:")]
+    if explain_notes:
+        st.markdown("---")
+        with st.expander(f"📚 My Saved Explanations ({len(explain_notes)})"):
+            for note in explain_notes:
+                st.markdown(f"**{note['title']}**")
+                st.caption(note.get("created_at", "")[:10])
+                st.markdown(note["content"][:300] + ("…" if len(note["content"]) > 300 else ""))
+                if st.button(f"🗑️ Delete", key=f"del_expl_{note['id']}"):
+                    delete_note(note["id"])
+                    st.rerun()
+                st.markdown("---")
 
 elif selected_page == "Summarize":
     # ══════════════════════════════════════════════════════
@@ -607,17 +853,21 @@ elif selected_page == "Summarize":
         st.markdown(result)
         st.markdown("</div>", unsafe_allow_html=True)
             
-        # --- Export Options ---
-        col_d, col_c = st.columns([1, 1])
+        # --- Actions ---
+        col_d, col_s, col_c = st.columns([1, 1, 1])
         with col_d:
             st.download_button(
-                "📥 Download Summary", 
+                "📥 Download", 
                 result, 
                 file_name="Summary.md",
                 mime="text/markdown"
             )
+        with col_s:
+            if st.button("💾 Save to Library", key="btn_save_summ"):
+                title = f"Summary: {result[:50].strip()}…"
+                if save_note(_UID, title, result):
+                    st.success("✅ Saved!")
         with col_c:
-                 # Share Button (JS)
                  share_js = f"""
                  <script>
                  async function share() {{
@@ -634,6 +884,21 @@ elif selected_page == "Summarize":
                  <button onclick="share()" style="background:none; border:1px solid #4b5563; border-radius:5px; padding:5px 10px; color:white; font-size:1rem; cursor:pointer;" title="Share">📤 Share</button>
                  """
                  components.html(share_js, height=50)
+
+    # --- Saved Summaries Library ---
+    saved_notes = get_notes(_UID)
+    summ_notes = [n for n in saved_notes if n.get("title", "").startswith("Summary:")]
+    if summ_notes:
+        st.markdown("---")
+        with st.expander(f"📚 My Saved Summaries ({len(summ_notes)})"):
+            for note in summ_notes:
+                st.markdown(f"**{note['title']}**")
+                st.caption(note.get("created_at", "")[:10])
+                st.markdown(note["content"][:300] + ("…" if len(note["content"]) > 300 else ""))
+                if st.button(f"🗑️ Delete", key=f"del_summ_{note['id']}"):
+                    delete_note(note["id"])
+                    st.rerun()
+                st.markdown("---")
 
 elif selected_page == "Quiz Me":
     # ══════════════════════════════════════════════════════
@@ -770,10 +1035,37 @@ elif selected_page == "Quiz Me":
         """, unsafe_allow_html=True)
         st.progress(score / len(questions))
 
+        # Auto-save quiz result to Supabase
+        quiz_topic_saved = st.session_state.get("quiz_topic_input", "Unknown")
+        if not st.session_state.get("quiz_result_saved"):
+            save_quiz_result(_UID, quiz_topic_saved[:120], score, len(questions))
+            st.session_state["quiz_result_saved"] = True
+
         if st.button("🔄 Try Again", key="btn_retry", use_container_width=True):
             st.session_state.quiz_submitted = False
             st.session_state.quiz_answers = {}
+            st.session_state["quiz_result_saved"] = False
             st.rerun()
+
+    # --- Quiz History ---
+    quiz_hist = get_quiz_history(_UID)
+    if quiz_hist:
+        st.markdown("---")
+        with st.expander(f"📊 My Quiz History ({len(quiz_hist)} recent)"):
+            for qr in quiz_hist:
+                pct = int(qr['score'] / qr['total'] * 100) if qr['total'] else 0
+                bar_color = '#34d399' if pct >= 70 else ('#fbbf24' if pct >= 40 else '#f87171')
+                st.markdown(f"""
+                <div style='display:flex; justify-content:space-between; align-items:center;
+                    border:1px solid rgba(255,255,255,0.07); border-radius:8px;
+                    padding:0.5rem 0.8rem; margin-bottom:0.4rem;'>
+                    <span style='font-size:0.85rem; color:#e6e9ef;'>{html.escape(qr.get('topic','')[:50])}</span>
+                    <span style='font-size:0.85rem; font-weight:700; color:{bar_color};'>
+                        {qr['score']}/{qr['total']} ({pct}%)
+                    </span>
+                    <span style='font-size:0.72rem; color:#475569;'>{qr.get('created_at','')[:10]}</span>
+                </div>
+                """, unsafe_allow_html=True)
 
 elif selected_page == "Flashcards":
     # ══════════════════════════════════════════════════════
@@ -860,6 +1152,12 @@ elif selected_page == "Flashcards":
         st.markdown(f"<div style='text-align:center; color:#64748b; font-size:0.85rem; margin-top:0.5rem;'>Card {idx+1} of {len(cards)}</div>", unsafe_allow_html=True)
         st.progress((idx + 1) / len(cards))
 
+        # Save Set button
+        flash_topic_val = st.session_state.get("flash_topic_input", "Flashcards")
+        if st.button("💾 Save Flashcard Set", key="btn_save_flash", use_container_width=True):
+            if save_flashcard_set(_UID, flash_topic_val[:80], cards):
+                st.success("✅ Flashcard set saved to your library!")
+
         # Card list toggle
         with st.expander("📋 View All Cards"):
             for j, c in enumerate(cards):
@@ -870,6 +1168,22 @@ elif selected_page == "Flashcards":
                     <span style='color:#94a3b8;'>{c.get("back","")}</span>
                 </div>
                 """, unsafe_allow_html=True)
+
+    # --- Load Saved Flashcard Sets ---
+    flash_sets = get_flashcard_sets(_UID)
+    if flash_sets:
+        st.markdown("---")
+        with st.expander(f"🗂️ My Saved Flashcard Sets ({len(flash_sets)})"):
+            for fs in flash_sets:
+                col_load, col_info = st.columns([1, 3])
+                with col_info:
+                    st.markdown(f"**{html.escape(fs.get('topic','Set'))}** · {len(fs.get('cards',[]))} cards · {fs.get('created_at','')[:10]}")
+                with col_load:
+                    if st.button("Load", key=f"load_flash_{fs['id']}"):
+                        st.session_state.flashcards = fs["cards"]
+                        st.session_state.card_index = 0
+                        st.session_state.card_flipped = False
+                        st.rerun()
 
 elif selected_page == "Chat Tutor":
     # ══════════════════════════════════════════════════════
@@ -895,11 +1209,15 @@ elif selected_page == "Chat Tutor":
     col_header, col_clear = st.columns([4, 1])
     with col_clear:
         if st.button("🗑️ Clear Chat", key="btn_clear_chat"):
+            if _UID:
+                save_chat_history(_UID, [])
             st.session_state.chat_history = []
             st.session_state.latest_audio = None
             st.rerun()
 
     # Welcome message when empty
+    if not _UID:
+        st.info("Sign in to save your chat history (including voice questions and answers) across sessions.")
     if not st.session_state.chat_history:
         st.markdown("""
         <div style='text-align:center; padding:2rem; color:#475569;'>
@@ -995,14 +1313,7 @@ elif selected_page == "Chat Tutor":
         audio_val = st.audio_input("Record voice question", label_visibility="collapsed")
         
         if audio_val:
-            # Check if this audio is new by comparing content
-            audio_bytes = audio_val.read()
-            # Simple hash check or state check to avoid re-transcribing same audio
-            # But st.audio_input usually resets on rerun or holds value. 
-            # We can check if it matches the last processed voice.
-            # For simplicity, we process it if it's there. 
-            pass 
-            # Note: streamlit script reruns when audio is recorded.
+            pass  # Don't read() here — would consume stream before transcribe_audio
     else:
         audio_val = None
 
@@ -1035,12 +1346,19 @@ elif selected_page == "Chat Tutor":
     # Because st.audio_input triggers rerun immediately.
     
     if audio_val:
-        # Transcribe
+        # Transcribe (seek to start in case stream was read earlier)
         with st.spinner("👂 Listening & Transcribing..."):
-            # We only process if it's different from last time
+            try:
+                audio_val.seek(0)
+            except (AttributeError, OSError):
+                pass
             current_audio_hash = hash(audio_val.getvalue())
             if "last_audio_hash" not in st.session_state or st.session_state.last_audio_hash != current_audio_hash:
                 st.session_state.last_audio_hash = current_audio_hash
+                try:
+                    audio_val.seek(0)
+                except (AttributeError, OSError):
+                    pass
                 text_from_voice = transcribe_audio(audio_val)
                 if text_from_voice.strip():
                      final_input = text_from_voice
@@ -1088,5 +1406,8 @@ elif selected_page == "Chat Tutor":
              msg_obj["audio"] = audio_reply
         
         st.session_state.chat_history.append(msg_obj)
+        # Auto-save chat history to Supabase (only when logged in; strips audio bytes)
+        if _UID:
+            save_chat_history(_UID, st.session_state.chat_history)
         st.rerun()
 
