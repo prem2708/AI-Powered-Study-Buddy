@@ -2,6 +2,8 @@
 
 > A Streamlit-based learning assistant that explains topics, summarizes notes, generates quizzes and flashcards, provides a chat-style tutor, and supports text-to-speech and audio transcription via Groq APIs.
 
+🔗 **Live demo:** https://ai-powered-study-buddy-prem.streamlit.app/
+
 ---
 
 ## Features
